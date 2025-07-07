@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block title %}Home - Rust Blog{% endblock %}
+
+{% block content %}
+    <h2>Latest Articles</h2>
+    
+    {% if posts %}
+        <ul>
+        {% for post in posts %}
+            <li>
+                <h3><a href="/post/{{ post.id }}">{{ post.title }}</a></h3>
+                <p>{{ post.summary }}</p>
+                <small>Published on: {{ post.date }}</small>
+            </li>
+        {% endfor %}
+        </ul>
+    {% else %}
+        <p>No articles yet</p>
+    {% endif %}
+{% endblock %}
