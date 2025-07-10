@@ -11,3 +11,8 @@ serde_json = "1.0"
 tera = "1.19.0"
 env_logger = "0.10.0"
 log = "0.4.20"
+sqlx = { version = "0.7.2", features = ["sqlite", "runtime-tokio-native-tls"] }
+bcrypt = "0.15.0"
+rand = "0.8.5"
+chrono = { version = "0.4.31", features = ["serde"] }
+actix-session = { version = "0.10.1", features = ["cookie-session"] }
