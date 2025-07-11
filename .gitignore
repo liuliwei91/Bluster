@@ -30,6 +30,7 @@ logs/
 # 临时文件
 tmp/
 temp/
+blog.db
 
 # 依赖缓存目录
 .cargo-cache/

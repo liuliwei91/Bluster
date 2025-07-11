@@ -15,7 +15,7 @@ struct LoginForm {
     password: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 struct ArticleForm {
     title: String,
     content: String,
@@ -130,7 +130,6 @@ async fn login_page(data: web::Data<AppState>) -> impl Responder {
         }
     }
 }
-
 async fn admin_dashboard(
     data: web::Data<AppState>,
     session: Session,
@@ -139,12 +138,44 @@ async fn admin_dashboard(
     // 检查session中的登录状态
     if let Some(_) = session.get::<String>("username")? {
         // 已登录，显示dashboard
-        let ctx = Context::new();
-        match data.template.render("admin/dashboard.html", &ctx) {
-            Ok(html) => Ok(HttpResponse::Ok().content_type("text/html").body(html)),
+        match sqlx::query_as::<_, (i64, String, String)>(
+            "SELECT id, title, content FROM articles ORDER BY created_at DESC"
+        )
+        .fetch_all(_pool.get_ref())
+        .await {
+            Ok(articles) => {
+                let mut ctx = Context::new();
+                // 打印articles调试信息
+                info!("Articles data: {:?}", articles);
+                // 转换articles为模板需要的格式
+                #[derive(serde::Serialize)]
+                struct TemplateArticle {
+                    id: i64,
+                    title: String,
+                    content: String
+                }
+                let template_articles: Vec<TemplateArticle> = articles.iter()
+                    .map(|(id, title, content)| {
+                        info!("Processing article - id: {}, title: {}", id, title);
+                        TemplateArticle {
+                            id: *id,
+                            title: title.clone(),
+                            content: content.clone()
+                        }
+                    })
+                    .collect();
+                ctx.insert("articles", &template_articles);
+                match data.template.render("admin/dashboard.html", &ctx) {
+                    Ok(html) => Ok(HttpResponse::Ok().content_type("text/html").body(html)),
+                    Err(e) => {
+                        error!("Detailed template rendering error: {:#?}", e);
+                        Ok(HttpResponse::InternalServerError().body(format!("Detailed template error: {:#?}", e)))
+                    }
+                }
+            },
             Err(e) => {
-                error!("Template rendering error: {}", e);
-                Ok(HttpResponse::InternalServerError().body("Template rendering error"))
+                error!("Failed to fetch articles: {}", e);
+                Ok(HttpResponse::InternalServerError().finish())
             }
         }
     } else {
@@ -155,15 +186,102 @@ async fn admin_dashboard(
     }
 }
 
-async fn admin_articles(pool: web::Data<SqlitePool>) -> impl Responder {
+async fn admin_articles(
+    _pool: web::Data<SqlitePool>,
+    session: Session
+) -> impl Responder {
+    // 检查session中的登录状态
+    if session.get::<String>("username").unwrap_or(None).is_none() {
+        return HttpResponse::Found()
+            .append_header(("Location", "/login"))
+            .finish();
+    }
+    
     match sqlx::query_as::<_, (i64, String, String)>(
         "SELECT id, title, content FROM articles ORDER BY created_at DESC"
     )
-    .fetch_all(pool.get_ref())
+    .fetch_all(_pool.get_ref())
     .await {
         Ok(articles) => HttpResponse::Ok().json(articles),
         Err(e) => {
             error!("Failed to fetch articles: {}", e);
+            HttpResponse::InternalServerError().json("Failed to fetch articles")
+        }
+    }
+}
+
+async fn admin_edit_article(
+    data: web::Data<AppState>,
+    path: web::Path<i64>,
+    _pool: web::Data<SqlitePool>,
+    session: Session
+) -> impl Responder {
+    // 检查session中的登录状态
+    if session.get::<String>("username").unwrap_or(None).is_none() {
+        return HttpResponse::Found()
+            .append_header(("Location", "/login"))
+            .finish();
+    }
+    let article_id = path.into_inner();
+    match sqlx::query_as::<_, (i64, String, String)>(
+        "SELECT id, title, content FROM articles WHERE id = ?"
+    )
+    .bind(article_id)
+    .fetch_one(_pool.get_ref())
+    .await {
+        Ok((id, title, content)) => {
+            #[derive(serde::Serialize)]
+            struct TemplateArticle {
+                id: i64,
+                title: String,
+                content: String
+            }
+            let mut ctx = Context::new();
+            ctx.insert("article", &TemplateArticle {
+                id,
+                title,
+                content
+            });
+            match data.template.render("admin/edit_article.html", &ctx) {
+                Ok(html) => HttpResponse::Ok().content_type("text/html").body(html),
+                Err(e) => {
+                    error!("Template rendering error: {:#?}", e);
+                    HttpResponse::InternalServerError().body(format!("Template rendering error: {:#?}", e))
+                }
+            }
+        },
+        Err(e) => {
+            error!("Failed to fetch article: {}", e);
+            HttpResponse::NotFound().finish()
+        }
+    }
+}
+
+async fn admin_update_article(
+    path: web::Path<i64>,
+    json: web::Json<ArticleForm>,
+    _pool: web::Data<SqlitePool>,
+    session: Session
+) -> impl Responder {
+    // 检查session中的登录状态
+    if session.get::<String>("username").unwrap_or(None).is_none() {
+        return HttpResponse::Found()
+            .append_header(("Location", "/login"))
+            .finish();
+    }
+    
+    let article_id = path.into_inner();
+    match sqlx::query(
+        "UPDATE articles SET title = ?, content = ?, updated_at = datetime('now') WHERE id = ?"
+    )
+    .bind(&json.title)
+    .bind(&json.content)
+    .bind(article_id)
+    .execute(_pool.get_ref())
+    .await {
+        Ok(_) => HttpResponse::Ok().json("Article updated successfully"),
+        Err(e) => {
+            error!("Failed to update article: {}", e);
             HttpResponse::InternalServerError().finish()
         }
     }
@@ -171,14 +289,14 @@ async fn admin_articles(pool: web::Data<SqlitePool>) -> impl Responder {
 
 async fn admin_create_article(
     form: web::Form<ArticleForm>,
-    pool: web::Data<SqlitePool>,
+    _pool: web::Data<SqlitePool>,
 ) -> impl Responder {
     match sqlx::query(
         "INSERT INTO articles (title, content, created_at, updated_at) VALUES (?, ?, datetime('now'), datetime('now'))"
     )
     .bind(&form.title)
     .bind(&form.content)
-    .execute(pool.get_ref())
+    .execute(_pool.get_ref())
     .await {
         Ok(_) => HttpResponse::Found().append_header(("Location", "/admin")).finish(),
         Err(e) => {
@@ -190,10 +308,10 @@ async fn admin_create_article(
 
 async fn login(
     form: web::Form<LoginForm>,
-    pool: web::Data<SqlitePool>,
+    _pool: web::Data<SqlitePool>,
     session: Session,
 ) -> impl Responder {
-    match verify_user(&pool, &form.username, &form.password).await {
+    match verify_user(&_pool, &form.username, &form.password).await {
         Ok(_) => {
             // 登录成功，设置session
             if let Err(e) = session.insert("username", &form.username) {
@@ -214,11 +332,11 @@ async fn logout(session: Session) -> impl Responder {
         .finish()
 }
 
-async fn get_articles(pool: web::Data<SqlitePool>) -> impl Responder {
+async fn get_articles(_pool: web::Data<SqlitePool>) -> impl Responder {
     match sqlx::query_as::<_, (i64, String, String)>(
         "SELECT id, title, content FROM articles ORDER BY created_at DESC"
     )
-    .fetch_all(pool.get_ref())
+    .fetch_all(_pool.get_ref())
     .await {
         Ok(articles) => HttpResponse::Ok().json(articles),
         Err(e) => {
@@ -229,7 +347,7 @@ async fn get_articles(pool: web::Data<SqlitePool>) -> impl Responder {
 }
 
 async fn get_article(
-    pool: web::Data<SqlitePool>,
+    _pool: web::Data<SqlitePool>,
     path: web::Path<i64>
 ) -> impl Responder {
     let article_id = path.into_inner();
@@ -237,7 +355,7 @@ async fn get_article(
         "SELECT id, title, content FROM articles WHERE id = ?"
     )
     .bind(article_id)
-    .fetch_one(pool.get_ref())
+    .fetch_one(_pool.get_ref())
     .await {
         Ok(article) => HttpResponse::Ok().json(article),
         Err(e) => {
@@ -250,7 +368,7 @@ async fn get_article(
 async fn update_article(
     path: web::Path<i64>,
     form: web::Form<ArticleForm>,
-    pool: web::Data<SqlitePool>,
+    _pool: web::Data<SqlitePool>,
 ) -> impl Responder {
     let article_id = path.into_inner();
     match sqlx::query(
@@ -259,7 +377,7 @@ async fn update_article(
     .bind(&form.title)
     .bind(&form.content)
     .bind(article_id)
-    .execute(pool.get_ref())
+    .execute(_pool.get_ref())
     .await {
         Ok(_) => HttpResponse::Ok().json("Article updated successfully"),
         Err(e) => {
@@ -271,14 +389,21 @@ async fn update_article(
 
 async fn delete_article(
     path: web::Path<i64>,
-    pool: web::Data<SqlitePool>,
+    _pool: web::Data<SqlitePool>,
+    session: Session
 ) -> impl Responder {
+    // 检查session中的登录状态
+    if session.get::<String>("username").unwrap_or(None).is_none() {
+        return HttpResponse::Found()
+            .append_header(("Location", "/login"))
+            .finish();
+    }
     let article_id = path.into_inner();
     match sqlx::query(
         "DELETE FROM articles WHERE id = ?"
     )
     .bind(article_id)
-    .execute(pool.get_ref())
+    .execute(_pool.get_ref())
     .await {
         Ok(_) => HttpResponse::Ok().json("Article deleted successfully"),
         Err(e) => {
@@ -290,14 +415,14 @@ async fn delete_article(
 
 async fn create_article(
     form: web::Form<ArticleForm>,
-    pool: web::Data<SqlitePool>,
+    _pool: web::Data<SqlitePool>,
 ) -> impl Responder {
     match sqlx::query(
         "INSERT INTO articles (title, content, created_at, updated_at) VALUES (?, ?, datetime('now'), datetime('now'))"
     )
     .bind(&form.title)
     .bind(&form.content)
-    .execute(pool.get_ref())
+    .execute(_pool.get_ref())
     .await {
         Ok(_) => HttpResponse::Ok().json("Article created successfully"),
         Err(e) => {
@@ -359,6 +484,7 @@ async fn main() -> std::io::Result<()> {
                 .build()
             )
             .route("/", web::get().to(index))
+            .route("/admin", web::get().to(admin_dashboard))
             .route("/post/{id}", web::get().to(post_detail))
             .route("/about", web::get().to(about))
             .route("/login", web::get().to(login_page))
@@ -369,9 +495,11 @@ async fn main() -> std::io::Result<()> {
             .route("/articles", web::post().to(create_article))
             .route("/articles/{id}", web::put().to(update_article))
             .route("/articles/{id}", web::delete().to(delete_article))
-            .route("/admin", web::get().to(admin_dashboard))
             .route("/admin/articles", web::get().to(admin_articles))
             .route("/admin/articles", web::post().to(admin_create_article))
+            .route("/admin/articles/{id}/edit", web::get().to(admin_edit_article))
+            .route("/admin/articles/{id}", web::put().to(admin_update_article))
+            .route("/admin/articles/{id}", web::delete().to(delete_article))
     })
     .bind("127.0.0.1:8080")?
     .run()

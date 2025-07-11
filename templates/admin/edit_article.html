@@ -1,0 +1,65 @@
+{% extends "base_admin.html" %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <h1 class="text-3xl font-bold text-gray-800 mb-6">Edit Article</h1>
+    
+    <div class="bg-white rounded-lg shadow-md p-6">
+        <form id="editForm">
+            <div class="mb-4">
+                <label class="block text-gray-700 text-sm font-bold mb-2" for="title">
+                    Title
+                </label>
+                <input class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" 
+                       id="title" name="title" type="text" value="{{ article.title }}" required>
+            </div>
+            <div class="mb-4">
+                <label class="block text-gray-700 text-sm font-bold mb-2" for="content">
+                    Content
+                </label>
+                <textarea class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline h-48" 
+                          id="content" name="content" required>{{ article.content }}</textarea>
+            </div>
+            <div class="flex items-center justify-end">
+                <button class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline" 
+                        type="button" onclick="updateArticle({{ article.id }})">
+                    Update
+                </button>
+            </div>
+        </form>
+
+        <script>
+        function updateArticle(articleId) {
+            const form = document.getElementById('editForm');
+            const formData = {
+                title: form.title.value,
+                content: form.content.value
+            };
+
+            fetch(`/admin/articles/${articleId}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(formData)
+            })
+            .then(response => {
+                if (response.ok) {
+                    window.location.href = '/admin';
+                } else {
+                    response.json().then(err => {
+                        alert(`Failed to update article: ${err}`);
+                    }).catch(() => {
+                        alert('Failed to update article');
+                    });
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error updating article');
+            });
+        }
+        </script>
+    </div>
+</div>
+{% endblock %}
