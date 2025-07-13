@@ -1,0 +1,72 @@
+{% extends "base_admin.html" %}
+
+{% block title %}Edit About - Admin Panel{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-3xl font-bold text-gray-800">Edit About Content</h1>
+        <a href="/admin" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
+            Back to Dashboard
+        </a>
+    </div>
+    
+    <div class="bg-white rounded-lg shadow-md p-6">
+        <form id="about-form">
+            <div class="mb-4">
+                <label class="block text-gray-700 text-sm font-bold mb-2" for="title">
+                    Title
+                </label>
+                <input class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" 
+                       id="title" name="title" type="text" value="{{ title }}" required>
+            </div>
+            <div class="mb-6">
+                <label class="block text-gray-700 text-sm font-bold mb-2" for="content">
+                    Content
+                </label>
+                <textarea class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline h-64" 
+                          id="content" name="content" required>{{ content }}</textarea>
+            </div>
+            <div class="flex items-center justify-between">
+                <button class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline" 
+                        type="submit">
+                    Update About
+                </button>
+                <span class="text-sm text-gray-600">Last updated: {{ updated_at }}</span>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+document.getElementById('about-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(this);
+    const data = {
+        title: formData.get('title'),
+        content: formData.get('content')
+    };
+    
+    try {
+        const response = await fetch('/admin/about', {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(data)
+        });
+        
+        if (response.ok) {
+            alert('About content updated successfully!');
+            window.location.href = '/admin';
+        } else {
+            alert('Failed to update about content');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('An error occurred while updating about content');
+    }
+});
+</script>
+{% endblock %}

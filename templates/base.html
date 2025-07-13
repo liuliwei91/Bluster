@@ -1,53 +1,32 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Rust Blog{% endblock %}</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            line-height: 1.6;
-            margin: 0;
-            padding: 20px;
-            max-width: 800px;
-            margin: 0 auto;
-        }
-        header {
-            border-bottom: 1px solid #ddd;
-            margin-bottom: 20px;
-            padding-bottom: 10px;
-        }
-        nav a {
-            margin-right: 15px;
-            text-decoration: none;
-            color: #333;
-        }
-        .content {
-            margin: 20px 0;
-        }
-        footer {
-            border-top: 1px solid #ddd;
-            margin-top: 30px;
-            padding-top: 10px;
-            font-size: 0.8em;
-            color: #777;
-        }
-    </style>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
 </head>
-<body>
-    <header>
-        <h1>My Rust Blog</h1>
-        <nav>
-            <a href="/">Home</a>
-            <a href="/about">About</a>
-        </nav>
+<body class="bg-gray-50 min-h-screen">
+    <header class="bg-white shadow-sm">
+        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center">
+                    <h1 class="text-2xl font-bold text-gray-900">My Rust Blog</h1>
+                </div>
+                <nav class="flex space-x-8">
+                    <a href="/" class="text-gray-700 hover:text-blue-600 transition-colors font-medium">Home</a>
+                    <a href="/about" class="text-gray-700 hover:text-blue-600 transition-colors font-medium">About</a>
+                </nav>
+            </div>
+        </div>
     </header>
     
-    <div class="content">
+    <main class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {% block content %}{% endblock %}
-    </div>
+    </main>
     
-    <footer>
+    <footer class="bg-white border-t border-gray-200 mt-16">
+        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         &copy; 2025 Rust Blog - Built with Rust and Actix-web
     </footer>
 </body>

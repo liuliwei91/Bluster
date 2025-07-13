@@ -3,19 +3,46 @@
 {% block title %}Home - Rust Blog{% endblock %}
 
 {% block content %}
-    <h2>Latest Articles</h2>
+<div class="space-y-8">
+    <div class="text-center">
+        <h1 class="text-4xl font-bold text-gray-900 mb-4">Welcome to My Rust Blog</h1>
+        <p class="text-xl text-gray-600 max-w-2xl mx-auto">Exploring the world of Rust programming, web development, and modern software engineering.</p>
+    </div>
     
-    {% if posts %}
-        <ul>
-        {% for post in posts %}
-            <li>
-                <h3><a href="/post/{{ post.id }}">{{ post.title }}</a></h3>
-                <p>{{ post.summary }}</p>
-                <small>Published on: {{ post.date }}</small>
-            </li>
-        {% endfor %}
-        </ul>
-    {% else %}
-        <p>No articles yet</p>
-    {% endif %}
+    <div class="border-t border-gray-200 pt-8">
+        <h2 class="text-2xl font-bold text-gray-900 mb-6">Latest Articles</h2>
+        
+        {% if posts %}
+            <div class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {% for post in posts %}
+                <article class="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300 overflow-hidden">
+                    <div class="p-6">
+                        <h3 class="text-xl font-semibold text-gray-900 mb-3 hover:text-blue-600 transition-colors">
+                            <a href="/post/{{ post.id }}" class="block">{{ post.title }}</a>
+                        </h3>
+                        <p class="text-gray-600 mb-4 line-clamp-3">{{ post.summary }}</p>
+                        <div class="flex items-center justify-between text-sm text-gray-500">
+                            <time class="flex items-center">
+                                <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd"></path>
+                                </svg>
+                                {{ post.date }}
+                            </time>
+                            <a href="/post/{{ post.id }}" class="text-blue-600 hover:text-blue-800 font-medium">Read more →</a>
+                        </div>
+                    </div>
+                </article>
+            {% endfor %}
+            </div>
+        {% else %}
+            <div class="text-center py-12">
+                <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <h3 class="mt-2 text-sm font-medium text-gray-900">No articles yet</h3>
+                <p class="mt-1 text-sm text-gray-500">Get started by creating your first article.</p>
+            </div>
+        {% endif %}
+    </div>
+</div>
 {% endblock %}
