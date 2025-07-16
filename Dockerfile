@@ -1,11 +1,17 @@
 # 使用官方Rust镜像作为构建环境
-FROM rust:1.75 as builder
+FROM 1.88.0-slim-trixie as builder
+
+# 安装构建依赖
+RUN apt-get update && apt-get install -y \
+    pkg-config \
+    libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
 
 # 设置工作目录
 WORKDIR /app
 
 # 复制Cargo文件
-COPY Cargo.toml Cargo.lock ./
+COPY Cargo.toml ./
 
 # 创建一个虚拟的main.rs来缓存依赖
 RUN mkdir src && echo "fn main() {}" > src/main.rs
