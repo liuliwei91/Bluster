@@ -847,7 +847,7 @@ async fn main() -> std::io::Result<()> {
             .route("/reset-password", web::post().to(reset_password))
             .route("/api/security-question", web::get().to(get_security_question))
     })
-    .bind("127.0.0.1:8080")?
+    .bind("0.0.0.0:8080")?
     .run()
     .await
 }
