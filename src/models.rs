@@ -38,7 +38,8 @@ pub struct About {
 
 pub async fn init_db() -> Result<SqlitePool, sqlx::Error> {
     // Create absolute path to database file
-    let db_path = "sqlite:blog.db?mode=rwc";
+    let db_path = "sqlite:./data/blog.db?mode=rwc";
+
     
     // Try to connect to database (will create if not exists)
     let pool = match SqlitePool::connect(db_path).await {

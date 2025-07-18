@@ -50,6 +50,8 @@ create_data_dir() {
     if [ ! -d "./data" ]; then
         mkdir -p ./data
         log_info "创建数据目录: ./data"
+        chown -R 1000:1000 ./data
+        log_info "设置数据目录权限: 1000:1000"
     fi
 }
 
@@ -160,7 +162,7 @@ full_deploy() {
     log_info "访问地址: http://localhost:8080"
     log_info "管理后台: http://localhost:8080/admin"
     log_info "默认用户名: admin"
-    log_info "默认密码: admin123"
+    log_info "默认密码: admin"
     echo ""
     log_warning "请及时修改默认密码！"
 }
