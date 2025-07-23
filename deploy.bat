@@ -102,6 +102,47 @@ docker-compose ps
 echo.
 call :log_info "容器详细信息:"
 docker inspect bluster-blog --format="{{.State.Status}}" 2>nul || echo 容器未运行
+echo.
+call :log_info "验证Markdown功能..."
+call :verify_markdown_functionality
+goto :eof
+
+REM 验证Markdown功能
+:verify_markdown_functionality
+set "test_passed=true"
+
+REM 检查主页是否可访问
+curl -f -s http://localhost:8080/ >nul 2>&1
+if errorlevel 1 (
+    call :log_error "✗ 主页访问失败"
+    set "test_passed=false"
+) else (
+    call :log_success "✓ 主页访问正常"
+)
+
+REM 检查管理后台是否可访问
+curl -f -s http://localhost:8080/admin >nul 2>&1
+if errorlevel 1 (
+    call :log_error "✗ 管理后台访问失败"
+    set "test_passed=false"
+) else (
+    call :log_success "✓ 管理后台访问正常"
+)
+
+REM 检查API端点是否可访问
+curl -f -s http://localhost:8080/api/articles >nul 2>&1
+if errorlevel 1 (
+    call :log_warning "⚠ API端点可能未启用或需要认证"
+) else (
+    call :log_success "✓ API端点访问正常"
+)
+
+if "%test_passed%"=="true" (
+    call :log_success "Markdown功能验证通过"
+) else (
+    call :log_error "Markdown功能验证失败，请检查日志"
+    exit /b 1
+)
 goto :eof
 
 REM 清理资源
@@ -177,7 +218,12 @@ call :log_info "管理后台: http://localhost:8080/admin"
 call :log_info "默认用户名: admin"
 call :log_info "默认密码: admin123"
 echo.
+call :log_info "等待服务启动完成..."
+timeout /t 10 /nobreak >nul
+call :verify_markdown_functionality
+echo.
 call :log_warning "请及时修改默认密码！"
+call :log_info "Markdown功能已启用，支持文件导入导出和实时预览"
 goto :eof
 
 REM 主函数

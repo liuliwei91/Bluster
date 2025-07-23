@@ -28,11 +28,14 @@
     <div class="bg-white rounded-lg shadow-md p-6 mb-8">
         <div class="flex justify-between items-center mb-4">
             <h2 class="text-xl font-semibold text-gray-700">Recent Articles</h2>
-            <form method="POST" action="/admin/articles" class="inline">
+            <div class="flex space-x-2">
                 <button type="button" onclick="showCreateForm()" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
                     Create New Article
                 </button>
-            </form>
+                <button type="button" onclick="showImportForm()" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">
+                    Import Markdown
+                </button>
+            </div>
         </div>
         
         <!-- Create Article Form (Hidden by default) -->
@@ -40,18 +43,64 @@
             <h3 class="text-lg font-semibold text-gray-700 mb-4">Create New Article</h3>
             <form method="POST" action="/admin/articles">
                 <div class="mb-4">
-                    <label class="block text-gray-700 text-sm font-bold mb-2" for="title">
+                    <label class="block text-gray-700 text-sm font-bold mb-2" for="create-title">
                         Title
                     </label>
                     <input class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" 
-                           id="title" name="title" type="text" placeholder="Article title" required>
+                           id="create-title" name="title" type="text" placeholder="Article title" required>
                 </div>
                 <div class="mb-4">
-                    <label class="block text-gray-700 text-sm font-bold mb-2" for="content">
-                        Content
-                    </label>
-                    <textarea class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline h-48" 
-                              id="content" name="content" placeholder="Article content" required></textarea>
+                    <div class="flex justify-between items-center mb-2">
+                        <label class="block text-gray-700 text-sm font-bold" for="create-content">
+                            Content (Markdown)
+                        </label>
+                        <div class="flex space-x-2">
+                            <button type="button" id="createEditTab" class="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600 focus:outline-none">
+                                Edit
+                            </button>
+                            <button type="button" id="createPreviewTab" class="px-3 py-1 text-sm bg-gray-300 text-gray-700 rounded hover:bg-gray-400 focus:outline-none">
+                                Preview
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Editor Panel -->
+                    <div id="createEditorPanel">
+                        <textarea class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline font-mono" 
+                                  id="create-content" name="content" rows="12" placeholder="Write your article content in Markdown..." required></textarea>
+                        
+                        <!-- Markdown Toolbar -->
+                        <div class="mt-2 flex flex-wrap gap-2 p-2 bg-gray-50 border rounded">
+                            <button type="button" class="create-markdown-btn px-2 py-1 text-xs bg-gray-200 hover:bg-gray-300 rounded" data-action="bold" title="Bold">
+                                <strong>B</strong>
+                            </button>
+                            <button type="button" class="create-markdown-btn px-2 py-1 text-xs bg-gray-200 hover:bg-gray-300 rounded" data-action="italic" title="Italic">
+                                <em>I</em>
+                            </button>
+                            <button type="button" class="create-markdown-btn px-2 py-1 text-xs bg-gray-200 hover:bg-gray-300 rounded" data-action="heading" title="Heading">
+                                H1
+                            </button>
+                            <button type="button" class="create-markdown-btn px-2 py-1 text-xs bg-gray-200 hover:bg-gray-300 rounded" data-action="link" title="Link">
+                                🔗
+                            </button>
+                            <button type="button" class="create-markdown-btn px-2 py-1 text-xs bg-gray-200 hover:bg-gray-300 rounded" data-action="code" title="Code">
+                                &lt;/&gt;
+                            </button>
+                            <button type="button" class="create-markdown-btn px-2 py-1 text-xs bg-gray-200 hover:bg-gray-300 rounded" data-action="list" title="List">
+                                • List
+                            </button>
+                            <button type="button" class="create-markdown-btn px-2 py-1 text-xs bg-gray-200 hover:bg-gray-300 rounded" data-action="quote" title="Quote">
+                                " Quote
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Preview Panel -->
+                    <div id="createPreviewPanel" class="hidden">
+                        <div class="border rounded p-4 bg-gray-50 min-h-64" id="createPreviewContent">
+                            <p class="text-gray-500">Click "Preview" to see rendered content...</p>
+                        </div>
+                    </div>
                 </div>
                 <div class="flex items-center justify-between">
                     <button type="button" onclick="hideCreateForm()" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
@@ -63,6 +112,74 @@
                     </button>
                 </div>
             </form>
+        </div>
+        
+        <!-- Import Article Form (Hidden by default) -->
+        <div id="import-form" class="hidden mb-6 p-4 border border-gray-200 rounded">
+            <h3 class="text-lg font-semibold text-gray-700 mb-4">Import Markdown File</h3>
+            
+            <!-- File Upload Area -->
+            <div id="drop-zone" class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-gray-400 transition-colors cursor-pointer">
+                <div id="drop-zone-content">
+                    <svg class="mx-auto h-12 w-12 text-gray-400 mb-4" stroke="currentColor" fill="none" viewBox="0 0 48 48">
+                        <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                    <p class="text-lg text-gray-600 mb-2">Drop your .md file here</p>
+                    <p class="text-sm text-gray-500 mb-4">or click to browse</p>
+                    <button type="button" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+                        Choose File
+                    </button>
+                </div>
+                
+                <!-- Upload Progress -->
+                <div id="upload-progress" class="hidden">
+                    <div class="w-full bg-gray-200 rounded-full h-2 mb-4">
+                        <div id="progress-bar" class="bg-blue-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                    </div>
+                    <p id="progress-text" class="text-sm text-gray-600">Uploading...</p>
+                </div>
+                
+                <!-- Upload Result -->
+                <div id="upload-result" class="hidden">
+                    <div id="success-message" class="hidden text-green-600 mb-2">
+                        <svg class="inline w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                        </svg>
+                        <span id="success-text">File imported successfully!</span>
+                    </div>
+                    <div id="error-message" class="hidden text-red-600 mb-2">
+                        <svg class="inline w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                        </svg>
+                        <span id="error-text">Upload failed</span>
+                    </div>
+                    <button type="button" onclick="resetImportForm()" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
+                        Import Another File
+                    </button>
+                </div>
+            </div>
+            
+            <!-- File Input (Hidden) -->
+            <input type="file" id="file-input" accept=".md,.markdown" class="hidden">
+            
+            <!-- File Info -->
+            <div id="file-info" class="hidden mt-4 p-3 bg-gray-50 rounded">
+                <p class="text-sm text-gray-600">
+                    <strong>Selected file:</strong> <span id="file-name"></span>
+                </p>
+                <p class="text-sm text-gray-500">
+                    <strong>Size:</strong> <span id="file-size"></span>
+                </p>
+            </div>
+            
+            <div class="flex items-center justify-between mt-4">
+                <button type="button" onclick="hideImportForm()" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
+                    Cancel
+                </button>
+                <div class="text-sm text-gray-500">
+                    Supported formats: .md, .markdown (max 5MB)
+                </div>
+            </div>
         </div>
         
         <!-- Articles List -->
@@ -84,6 +201,7 @@
                         <td class="py-2 px-4 border-b border-gray-200">{{ article.created_at }}</td>
                         <td class="py-2 px-4 border-b border-gray-200">
                             <a href="/admin/articles/{{ article.id }}/edit" class="text-blue-500 hover:text-blue-700 mr-2">Edit</a>
+                            <button onclick="exportArticle({{ article.id }}, '{{ article.title }}')" class="text-green-500 hover:text-green-700 bg-transparent border-none cursor-pointer mr-2">Export</button>
                             <button onclick="deleteArticle({{ article.id }})" class="text-red-500 hover:text-red-700 bg-transparent border-none cursor-pointer">Delete</button>
                         </td>
                     </tr>
@@ -101,6 +219,24 @@ function showCreateForm() {
 
 function hideCreateForm() {
     document.getElementById('create-form').classList.add('hidden');
+}
+
+function showImportForm() {
+    document.getElementById('import-form').classList.remove('hidden');
+}
+
+function hideImportForm() {
+    document.getElementById('import-form').classList.add('hidden');
+    resetImportForm();
+}
+
+function resetImportForm() {
+    document.getElementById('drop-zone-content').classList.remove('hidden');
+    document.getElementById('upload-progress').classList.add('hidden');
+    document.getElementById('upload-result').classList.add('hidden');
+    document.getElementById('file-info').classList.add('hidden');
+    document.getElementById('file-input').value = '';
+    document.getElementById('progress-bar').style.width = '0%';
 }
 
 function deleteArticle(articleId) {
@@ -124,5 +260,300 @@ function deleteArticle(articleId) {
         });
     }
 }
+
+function exportArticle(articleId, articleTitle) {
+    // Show loading state
+    const exportButton = event.target;
+    const originalText = exportButton.textContent;
+    exportButton.textContent = 'Exporting...';
+    exportButton.disabled = true;
+    
+    // Create a temporary link to trigger download
+    const link = document.createElement('a');
+    link.href = `/admin/articles/${articleId}/export`;
+    link.download = `${articleTitle}.md`;
+    
+    // Handle the download
+    link.addEventListener('click', function() {
+        // Reset button state after a short delay
+        setTimeout(() => {
+            exportButton.textContent = originalText;
+            exportButton.disabled = false;
+        }, 1000);
+    });
+    
+    // Handle errors
+    link.addEventListener('error', function() {
+        alert('Failed to export article');
+        exportButton.textContent = originalText;
+        exportButton.disabled = false;
+    });
+    
+    // Trigger the download
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+// Markdown Editor Functionality for Create Form
+document.addEventListener('DOMContentLoaded', function() {
+    const createEditTab = document.getElementById('createEditTab');
+    const createPreviewTab = document.getElementById('createPreviewTab');
+    const createEditorPanel = document.getElementById('createEditorPanel');
+    const createPreviewPanel = document.getElementById('createPreviewPanel');
+    const createContentTextarea = document.getElementById('create-content');
+    const createPreviewContent = document.getElementById('createPreviewContent');
+    
+    // Tab switching for create form
+    if (createEditTab && createPreviewTab) {
+        createEditTab.addEventListener('click', function() {
+            showCreateEditMode();
+        });
+        
+        createPreviewTab.addEventListener('click', function() {
+            showCreatePreviewMode();
+        });
+    }
+    
+    function showCreateEditMode() {
+        createEditTab.classList.remove('bg-gray-300', 'text-gray-700');
+        createEditTab.classList.add('bg-blue-500', 'text-white');
+        createPreviewTab.classList.remove('bg-blue-500', 'text-white');
+        createPreviewTab.classList.add('bg-gray-300', 'text-gray-700');
+        
+        createEditorPanel.classList.remove('hidden');
+        createPreviewPanel.classList.add('hidden');
+    }
+    
+    function showCreatePreviewMode() {
+        createPreviewTab.classList.remove('bg-gray-300', 'text-gray-700');
+        createPreviewTab.classList.add('bg-blue-500', 'text-white');
+        createEditTab.classList.remove('bg-blue-500', 'text-white');
+        createEditTab.classList.add('bg-gray-300', 'text-gray-700');
+        
+        createEditorPanel.classList.add('hidden');
+        createPreviewPanel.classList.remove('hidden');
+        
+        // Load preview content
+        updateCreatePreview();
+    }
+    
+    function updateCreatePreview() {
+        const markdownContent = createContentTextarea.value;
+        
+        if (!markdownContent.trim()) {
+            createPreviewContent.innerHTML = '<p class="text-gray-500">No content to preview...</p>';
+            return;
+        }
+        
+        // Show loading state
+        createPreviewContent.innerHTML = '<p class="text-gray-500">Loading preview...</p>';
+        
+        fetch('/admin/articles/preview', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ content: markdownContent })
+        })
+        .then(response => {
+            if (response.ok) {
+                return response.json();
+            }
+            throw new Error('Preview failed');
+        })
+        .then(data => {
+            createPreviewContent.innerHTML = data.html;
+        })
+        .catch(error => {
+            console.error('Preview error:', error);
+            createPreviewContent.innerHTML = '<p class="text-red-500">Preview failed. Please check your markdown syntax.</p>';
+        });
+    }
+    
+    // Markdown toolbar functionality for create form
+    const createMarkdownButtons = document.querySelectorAll('.create-markdown-btn');
+    createMarkdownButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const action = this.getAttribute('data-action');
+            insertCreateMarkdown(action);
+        });
+    });
+    
+    function insertCreateMarkdown(action) {
+        const textarea = createContentTextarea;
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+        const selectedText = textarea.value.substring(start, end);
+        let replacement = '';
+        
+        switch(action) {
+            case 'bold':
+                replacement = `**${selectedText || 'bold text'}**`;
+                break;
+            case 'italic':
+                replacement = `*${selectedText || 'italic text'}*`;
+                break;
+            case 'heading':
+                replacement = `# ${selectedText || 'Heading'}`;
+                break;
+            case 'link':
+                replacement = `[${selectedText || 'link text'}](url)`;
+                break;
+            case 'code':
+                if (selectedText.includes('\n')) {
+                    replacement = `\`\`\`\n${selectedText || 'code'}\n\`\`\``;
+                } else {
+                    replacement = `\`${selectedText || 'code'}\``;
+                }
+                break;
+            case 'list':
+                replacement = `- ${selectedText || 'list item'}`;
+                break;
+            case 'quote':
+                replacement = `> ${selectedText || 'quote'}`;
+                break;
+        }
+        
+        textarea.value = textarea.value.substring(0, start) + replacement + textarea.value.substring(end);
+        
+        // Set cursor position
+        const newCursorPos = start + replacement.length;
+        textarea.setSelectionRange(newCursorPos, newCursorPos);
+        textarea.focus();
+    }
+    
+    // File Import Functionality
+    const dropZone = document.getElementById('drop-zone');
+    const fileInput = document.getElementById('file-input');
+    const fileInfo = document.getElementById('file-info');
+    const fileName = document.getElementById('file-name');
+    const fileSize = document.getElementById('file-size');
+    
+    if (dropZone && fileInput) {
+        // Click to browse
+        dropZone.addEventListener('click', function() {
+            fileInput.click();
+        });
+        
+        // Drag and drop events
+        dropZone.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            dropZone.classList.add('border-blue-400', 'bg-blue-50');
+        });
+        
+        dropZone.addEventListener('dragleave', function(e) {
+            e.preventDefault();
+            dropZone.classList.remove('border-blue-400', 'bg-blue-50');
+        });
+        
+        dropZone.addEventListener('drop', function(e) {
+            e.preventDefault();
+            dropZone.classList.remove('border-blue-400', 'bg-blue-50');
+            
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFileSelection(files[0]);
+            }
+        });
+        
+        // File input change
+        fileInput.addEventListener('change', function(e) {
+            if (e.target.files.length > 0) {
+                handleFileSelection(e.target.files[0]);
+            }
+        });
+    }
+    
+    function handleFileSelection(file) {
+        // Validate file type
+        if (!file.name.toLowerCase().endsWith('.md') && !file.name.toLowerCase().endsWith('.markdown')) {
+            alert('Please select a .md or .markdown file');
+            return;
+        }
+        
+        // Validate file size (5MB limit)
+        if (file.size > 5 * 1024 * 1024) {
+            alert('File size must be less than 5MB');
+            return;
+        }
+        
+        // Show file info
+        fileName.textContent = file.name;
+        fileSize.textContent = formatFileSize(file.size);
+        fileInfo.classList.remove('hidden');
+        
+        // Upload file
+        uploadFile(file);
+    }
+    
+    function uploadFile(file) {
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        // Show progress
+        document.getElementById('drop-zone-content').classList.add('hidden');
+        document.getElementById('upload-progress').classList.remove('hidden');
+        
+        const progressBar = document.getElementById('progress-bar');
+        const progressText = document.getElementById('progress-text');
+        
+        // Simulate progress (since we can't track actual upload progress easily)
+        let progress = 0;
+        const progressInterval = setInterval(() => {
+            progress += 10;
+            progressBar.style.width = progress + '%';
+            if (progress >= 90) {
+                clearInterval(progressInterval);
+            }
+        }, 100);
+        
+        fetch('/admin/articles/import', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => {
+            clearInterval(progressInterval);
+            progressBar.style.width = '100%';
+            return response.json();
+        })
+        .then(data => {
+            // Hide progress
+            document.getElementById('upload-progress').classList.add('hidden');
+            document.getElementById('upload-result').classList.remove('hidden');
+            
+            if (data.success) {
+                document.getElementById('success-message').classList.remove('hidden');
+                document.getElementById('success-text').textContent = `Article "${data.title}" imported successfully!`;
+                
+                // Refresh the page after a delay to show the new article
+                setTimeout(() => {
+                    window.location.reload();
+                }, 2000);
+            } else {
+                document.getElementById('error-message').classList.remove('hidden');
+                document.getElementById('error-text').textContent = data.message || 'Import failed';
+            }
+        })
+        .catch(error => {
+            clearInterval(progressInterval);
+            console.error('Upload error:', error);
+            
+            // Hide progress and show error
+            document.getElementById('upload-progress').classList.add('hidden');
+            document.getElementById('upload-result').classList.remove('hidden');
+            document.getElementById('error-message').classList.remove('hidden');
+            document.getElementById('error-text').textContent = 'Network error occurred';
+        });
+    }
+    
+    function formatFileSize(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+});
 </script>
 {% endblock %}

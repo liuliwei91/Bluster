@@ -96,6 +96,44 @@ check_status() {
     echo ""
     log_info "健康检查状态:"
     docker inspect bluster-blog --format='{{.State.Health.Status}}' 2>/dev/null || echo "健康检查未配置"
+    echo ""
+    log_info "验证Markdown功能..."
+    verify_markdown_functionality
+}
+
+# 验证Markdown功能
+verify_markdown_functionality() {
+    local test_passed=true
+    
+    # 检查主页是否可访问
+    if curl -f -s http://localhost:8080/ > /dev/null; then
+        log_success "✓ 主页访问正常"
+    else
+        log_error "✗ 主页访问失败"
+        test_passed=false
+    fi
+    
+    # 检查管理后台是否可访问
+    if curl -f -s http://localhost:8080/admin > /dev/null; then
+        log_success "✓ 管理后台访问正常"
+    else
+        log_error "✗ 管理后台访问失败"
+        test_passed=false
+    fi
+    
+    # 检查API端点是否可访问
+    if curl -f -s http://localhost:8080/api/articles > /dev/null; then
+        log_success "✓ API端点访问正常"
+    else
+        log_warning "⚠ API端点可能未启用或需要认证"
+    fi
+    
+    if [ "$test_passed" = true ]; then
+        log_success "Markdown功能验证通过"
+    else
+        log_error "Markdown功能验证失败，请检查日志"
+        return 1
+    fi
 }
 
 # 清理资源
@@ -162,9 +200,14 @@ full_deploy() {
     log_info "访问地址: http://localhost:8080"
     log_info "管理后台: http://localhost:8080/admin"
     log_info "默认用户名: admin"
-    log_info "默认密码: admin"
+    log_info "默认密码: admin123"
+    echo ""
+    log_info "等待服务启动完成..."
+    sleep 10
+    verify_markdown_functionality
     echo ""
     log_warning "请及时修改默认密码！"
+    log_info "Markdown功能已启用，支持文件导入导出和实时预览"
 }
 
 # 主函数

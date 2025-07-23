@@ -1,13 +1,35 @@
 use actix_web::{web, App, HttpServer, Responder, HttpResponse};
 use actix_web::middleware::Logger;
 use actix_session::{Session, SessionMiddleware};
+use actix_multipart::Multipart;
+use futures_util::TryStreamExt;
 use log::{info, error};
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
 use crate::models::{init_db, verify_user};
+use crate::services::{MarkdownService, FileService};
 use tera::{Tera, Context};
 
 mod models;
+mod services;
+
+// Helper function to strip HTML tags for creating plain text summaries
+fn strip_html_tags(html: &str) -> String {
+    let mut result = String::new();
+    let mut in_tag = false;
+    
+    for ch in html.chars() {
+        match ch {
+            '<' => in_tag = true,
+            '>' => in_tag = false,
+            _ if !in_tag => result.push(ch),
+            _ => {}
+        }
+    }
+    
+    // Clean up extra whitespace
+    result.split_whitespace().collect::<Vec<&str>>().join(" ")
+}
 
 #[derive(Deserialize)]
 struct LoginForm {
@@ -48,6 +70,16 @@ struct ResetPasswordForm {
     confirm_password: String,
 }
 
+#[derive(Deserialize)]
+struct PreviewRequest {
+    content: String,
+}
+
+#[derive(Serialize)]
+struct PreviewResponse {
+    html: String,
+}
+
 // Blog post structure
 #[derive(Serialize, Deserialize, Clone)]
 struct Post {
@@ -61,6 +93,7 @@ struct Post {
 // Application state, storing blog posts
 struct AppState {
     template: Tera,
+    markdown_service: MarkdownService,
 }
 
 async fn index(
@@ -76,11 +109,18 @@ async fn index(
     .await {
         Ok(articles) => {
             let posts: Vec<Post> = articles.into_iter().map(|(id, title, content, date)| {
+                // Render markdown content to HTML with fallback
+                let rendered_content = data.markdown_service.render_to_html_with_fallback(&content);
+                
+                // Create summary from plain text (strip HTML tags for summary)
+                let plain_text = strip_html_tags(&rendered_content);
+                let summary = plain_text.chars().take(100).collect();
+                
                 Post {
                     id: id as u32,
                     title,
-                    summary: content.chars().take(100).collect(),
-                    content,
+                    summary,
+                    content: rendered_content,
                     date
                 }
             }).collect();
@@ -115,11 +155,18 @@ async fn post_detail(
     .fetch_one(_pool.get_ref())
     .await {
         Ok((id, title, content, created_at)) => {
+            // Render markdown content to HTML with fallback
+            let rendered_content = data.markdown_service.render_to_html_with_fallback(&content);
+            
+            // Create summary from plain text
+            let plain_text = strip_html_tags(&rendered_content);
+            let summary = plain_text.chars().take(100).collect();
+            
             let post = Post {
                 id: id as u32,
                 title,
-                summary: content.chars().take(100).collect(),
-                content,
+                summary,
+                content: rendered_content,
                 date: created_at
             };
             ctx.insert("post", &post);
@@ -770,6 +817,252 @@ async fn get_security_question(
     }
 }
 
+// Performance monitoring endpoint
+async fn admin_performance_stats(
+    data: web::Data<AppState>,
+    session: Session
+) -> impl Responder {
+    // 检查session中的登录状态
+    if session.get::<String>("username").unwrap_or(None).is_none() {
+        return HttpResponse::Unauthorized().json(serde_json::json!({
+            "error": "Unauthorized"
+        }));
+    }
+    
+    let metrics = data.markdown_service.get_metrics();
+    let cache_hit_rate = if metrics.cache_hits + metrics.cache_misses > 0 {
+        (metrics.cache_hits as f64 / (metrics.cache_hits + metrics.cache_misses) as f64) * 100.0
+    } else {
+        0.0
+    };
+    
+    HttpResponse::Ok().json(serde_json::json!({
+        "total_renders": metrics.total_renders,
+        "cache_hits": metrics.cache_hits,
+        "cache_misses": metrics.cache_misses,
+        "cache_hit_rate": format!("{:.1}%", cache_hit_rate),
+        "avg_render_time_ms": format!("{:.2}", metrics.avg_render_time_ms),
+        "cache_size": metrics.cache_size,
+        "memory_usage_kb": format!("{:.2}", metrics.memory_usage_bytes as f64 / 1024.0)
+    }))
+}
+
+// Cache management endpoint
+async fn admin_cache_clear(
+    data: web::Data<AppState>,
+    session: Session
+) -> impl Responder {
+    // 检查session中的登录状态
+    if session.get::<String>("username").unwrap_or(None).is_none() {
+        return HttpResponse::Unauthorized().json(serde_json::json!({
+            "error": "Unauthorized"
+        }));
+    }
+    
+    data.markdown_service.clear_cache();
+    
+    HttpResponse::Ok().json(serde_json::json!({
+        "success": true,
+        "message": "Cache cleared successfully"
+    }))
+}
+
+// Cache optimization endpoint
+async fn admin_cache_optimize(
+    data: web::Data<AppState>,
+    session: Session
+) -> impl Responder {
+    // 检查session中的登录状态
+    if session.get::<String>("username").unwrap_or(None).is_none() {
+        return HttpResponse::Unauthorized().json(serde_json::json!({
+            "error": "Unauthorized"
+        }));
+    }
+    
+    data.markdown_service.optimize_cache();
+    
+    HttpResponse::Ok().json(serde_json::json!({
+        "success": true,
+        "message": "Cache optimized successfully"
+    }))
+}
+
+// Markdown预览功能
+async fn admin_preview_markdown(
+    data: web::Data<AppState>,
+    json: web::Json<PreviewRequest>,
+    session: Session
+) -> impl Responder {
+    // 检查session中的登录状态
+    if session.get::<String>("username").unwrap_or(None).is_none() {
+        return HttpResponse::Unauthorized().json(serde_json::json!({
+            "error": "Unauthorized"
+        }));
+    }
+    
+    match data.markdown_service.render_to_html(&json.content) {
+        Ok(html) => HttpResponse::Ok().json(PreviewResponse { html }),
+        Err(e) => {
+            error!("Markdown rendering failed: {}", e);
+            HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": "Failed to render markdown",
+                "details": e.to_string()
+            }))
+        }
+    }
+}
+
+// 文件导入功能
+async fn admin_import_article(
+    mut payload: Multipart,
+    _pool: web::Data<SqlitePool>,
+    session: Session
+) -> impl Responder {
+    // 检查session中的登录状态
+    if session.get::<String>("username").unwrap_or(None).is_none() {
+        return HttpResponse::Unauthorized().json(serde_json::json!({
+            "success": false,
+            "message": "Unauthorized"
+        }));
+    }
+
+    // 处理文件上传
+    while let Some(mut field) = payload.try_next().await.unwrap_or(None) {
+        let content_disposition = field.content_disposition();
+        
+        if let Some(filename) = content_disposition.get_filename() {
+            // 验证文件扩展名
+            if let Err(e) = FileService::validate_file_extension(filename) {
+                return HttpResponse::BadRequest().json(serde_json::json!({
+                    "success": false,
+                    "message": format!("Invalid file type: {}", e)
+                }));
+            }
+
+            // 读取文件内容
+            let mut file_content = Vec::new();
+            while let Some(chunk) = field.try_next().await.unwrap_or(None) {
+                file_content.extend_from_slice(&chunk);
+            }
+
+            // 转换为字符串
+            let content_str = match String::from_utf8(file_content) {
+                Ok(content) => content,
+                Err(_) => {
+                    return HttpResponse::BadRequest().json(serde_json::json!({
+                        "success": false,
+                        "message": "File must be valid UTF-8 text"
+                    }));
+                }
+            };
+
+            // 验证文件大小 (5MB limit)
+            if let Err(e) = FileService::validate_file_size(&content_str, 5) {
+                return HttpResponse::BadRequest().json(serde_json::json!({
+                    "success": false,
+                    "message": format!("File too large: {}", e)
+                }));
+            }
+
+            // 解析Markdown文件
+            match FileService::parse_markdown_file(&content_str) {
+                Ok(markdown_file) => {
+                    // 插入到数据库
+                    match sqlx::query(
+                        "INSERT INTO articles (title, content, created_at, updated_at) VALUES (?, ?, datetime('now'), datetime('now'))"
+                    )
+                    .bind(&markdown_file.title)
+                    .bind(&markdown_file.content)
+                    .execute(_pool.get_ref())
+                    .await {
+                        Ok(result) => {
+                            let article_id = result.last_insert_rowid();
+                            return HttpResponse::Ok().json(serde_json::json!({
+                                "success": true,
+                                "message": "Article imported successfully",
+                                "article_id": article_id,
+                                "title": markdown_file.title
+                            }));
+                        },
+                        Err(e) => {
+                            error!("Failed to insert article: {}", e);
+                            return HttpResponse::InternalServerError().json(serde_json::json!({
+                                "success": false,
+                                "message": "Failed to save article to database"
+                            }));
+                        }
+                    }
+                },
+                Err(e) => {
+                    return HttpResponse::BadRequest().json(serde_json::json!({
+                        "success": false,
+                        "message": format!("Failed to parse markdown file: {}", e)
+                    }));
+                }
+            }
+        }
+    }
+
+    HttpResponse::BadRequest().json(serde_json::json!({
+        "success": false,
+        "message": "No valid file found in upload"
+    }))
+}
+
+// 文章导出功能
+async fn admin_export_article(
+    path: web::Path<i64>,
+    _pool: web::Data<SqlitePool>,
+    session: Session
+) -> impl Responder {
+    // 检查session中的登录状态
+    if session.get::<String>("username").unwrap_or(None).is_none() {
+        return HttpResponse::Unauthorized().json(serde_json::json!({
+            "error": "Unauthorized"
+        }));
+    }
+
+    let article_id = path.into_inner();
+    
+    // 从数据库获取文章
+    match sqlx::query_as::<_, models::Article>(
+        "SELECT id, title, content, author_id, created_at, updated_at FROM articles WHERE id = ?"
+    )
+    .bind(article_id)
+    .fetch_one(_pool.get_ref())
+    .await {
+        Ok(article) => {
+            // 生成Markdown导出内容
+            let markdown_content = match FileService::generate_markdown_export(&article) {
+                Ok(content) => content,
+                Err(e) => {
+                    error!("Failed to generate markdown export: {}", e);
+                    return HttpResponse::InternalServerError().json(serde_json::json!({
+                        "success": false,
+                        "message": format!("Export generation failed: {}", e)
+                    }));
+                }
+            };
+            
+            // 生成安全的文件名
+            let safe_filename = FileService::sanitize_filename_with_fallback(&article.title);
+            let filename = format!("{}.md", safe_filename);
+            
+            // 返回文件下载响应
+            HttpResponse::Ok()
+                .content_type("text/markdown; charset=utf-8")
+                .append_header(("Content-Disposition", format!("attachment; filename=\"{}\"", filename)))
+                .body(markdown_content)
+        },
+        Err(e) => {
+            error!("Failed to fetch article for export: {}", e);
+            HttpResponse::NotFound().json(serde_json::json!({
+                "error": "Article not found"
+            }))
+        }
+    }
+}
+
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     // Initialize logging
@@ -789,9 +1082,45 @@ async fn main() -> std::io::Result<()> {
     };
     tera.autoescape_on(vec!["html", ".html", ".htm"]);
     
-    // Create application state
+    // Create application state with optimized markdown service
+    let cache_ttl = std::env::var("MARKDOWN_CACHE_TTL")
+        .unwrap_or_else(|_| "3600".to_string())
+        .parse::<u64>()
+        .unwrap_or(3600);
+    
+    let max_cache_size = std::env::var("MARKDOWN_MAX_CACHE_SIZE")
+        .unwrap_or_else(|_| "1000".to_string())
+        .parse::<usize>()
+        .unwrap_or(1000);
+    
+    let max_content_size = std::env::var("MARKDOWN_MAX_CONTENT_SIZE")
+        .unwrap_or_else(|_| "1048576".to_string())
+        .parse::<usize>()
+        .unwrap_or(1024 * 1024);
+    
+    let markdown_service = MarkdownService::with_cache_config(
+        std::time::Duration::from_secs(cache_ttl),
+        max_cache_size,
+        max_content_size,
+    );
+    
+    info!("Markdown service configured with cache TTL: {}s, max cache size: {}, max content size: {} bytes", 
+          cache_ttl, max_cache_size, max_content_size);
+    
     let app_state = web::Data::new(AppState {
         template: tera,
+        markdown_service,
+    });
+    
+    // Start periodic cache optimization task
+    let app_state_for_task = app_state.clone();
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(std::time::Duration::from_secs(1800)); // Every 30 minutes
+        loop {
+            interval.tick().await;
+            log::info!("Running periodic cache optimization...");
+            app_state_for_task.markdown_service.optimize_cache();
+        }
     });
     
     // Initialize database
@@ -838,11 +1167,17 @@ async fn main() -> std::io::Result<()> {
             .route("/admin/articles/{id}/edit", web::get().to(admin_edit_article))
             .route("/admin/articles/{id}", web::put().to(admin_update_article))
             .route("/admin/articles/{id}", web::delete().to(delete_article))
+            .route("/admin/articles/preview", web::post().to(admin_preview_markdown))
+            .route("/admin/articles/import", web::post().to(admin_import_article))
+            .route("/admin/articles/{id}/export", web::get().to(admin_export_article))
             .route("/admin/about/edit", web::get().to(admin_about_edit))
             .route("/admin/about", web::put().to(admin_update_about))
             .route("/admin/password", web::get().to(admin_password_settings))
             .route("/admin/password/change", web::post().to(admin_change_password))
             .route("/admin/security-question", web::post().to(admin_set_security_question))
+            .route("/admin/performance", web::get().to(admin_performance_stats))
+            .route("/admin/cache/clear", web::post().to(admin_cache_clear))
+            .route("/admin/cache/optimize", web::post().to(admin_cache_optimize))
             .route("/reset-password", web::get().to(reset_password_page))
             .route("/reset-password", web::post().to(reset_password))
             .route("/api/security-question", web::get().to(get_security_question))

@@ -11,9 +11,17 @@ services:
     environment:
       - RUST_LOG=info
       - DATABASE_URL=sqlite:///app/data/blog.db
+      - MARKDOWN_CACHE_TTL=3600
+      - MARKDOWN_MAX_CACHE_SIZE=1000
+      - MARKDOWN_MAX_CONTENT_SIZE=1048576
+      - MARKDOWN_SYNTAX_THEME=base16-ocean.dark
+      - MARKDOWN_ENABLE_TABLES=true
+      - MARKDOWN_ENABLE_STRIKETHROUGH=true
+      - MARKDOWN_ENABLE_TASKLISTS=true
+      - FILE_UPLOAD_MAX_SIZE=5242880
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/"]
+      test: ["CMD", "sh", "-c", "curl -f http://localhost:8080/ && curl -f http://localhost:8080/admin"]
       interval: 30s
       timeout: 10s
       retries: 3

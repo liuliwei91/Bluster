@@ -5,6 +5,93 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Rust Blog{% endblock %}</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <style>
+        /* Markdown content styling */
+        .prose {
+            max-width: none;
+        }
+        
+        /* Code highlighting styles */
+        .highlight {
+            background-color: #f8f8f8;
+            border: 1px solid #e1e1e1;
+            border-radius: 4px;
+            padding: 1rem;
+            overflow-x: auto;
+            margin: 1rem 0;
+        }
+        
+        .highlight code {
+            background: none;
+            padding: 0;
+            border: none;
+            border-radius: 0;
+        }
+        
+        .inline-code {
+            background-color: #f1f5f9;
+            color: #e11d48;
+            padding: 0.125rem 0.25rem;
+            border-radius: 0.25rem;
+            font-size: 0.875em;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+        }
+        
+        /* Syntax highlighting classes */
+        .highlight .text { color: #333; }
+        .highlight .plain { color: #333; }
+        .highlight .keyword { color: #0066cc; font-weight: bold; }
+        .highlight .string { color: #009900; }
+        .highlight .comment { color: #999; font-style: italic; }
+        .highlight .number { color: #ff6600; }
+        .highlight .function { color: #cc00cc; }
+        .highlight .type { color: #0066cc; }
+        .highlight .variable { color: #333; }
+        .highlight .operator { color: #666; }
+        .highlight .punctuation { color: #666; }
+        
+        /* Table styling */
+        .prose table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+        }
+        
+        .prose th, .prose td {
+            border: 1px solid #e1e1e1;
+            padding: 0.5rem;
+            text-align: left;
+        }
+        
+        .prose th {
+            background-color: #f8f8f8;
+            font-weight: bold;
+        }
+        
+        /* Task list styling */
+        .prose input[type="checkbox"] {
+            margin-right: 0.5rem;
+        }
+        
+        /* Blockquote styling */
+        .prose blockquote {
+            border-left: 4px solid #e1e1e1;
+            padding-left: 1rem;
+            margin: 1rem 0;
+            color: #666;
+            font-style: italic;
+        }
+        
+        /* Link styling */
+        .prose a {
+            color: #2563eb;
+            text-decoration: underline;
+        }
+        
+        .prose a:hover {
+            color: #1d4ed8;
+        }
+    </style>
 </head>
 <body class="bg-gray-50 min-h-screen">
     <header class="bg-white shadow-sm">

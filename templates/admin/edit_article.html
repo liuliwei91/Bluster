@@ -13,14 +13,67 @@
                 <input class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" 
                        id="title" name="title" type="text" value="{{ article.title }}" required>
             </div>
+            
+            <!-- Markdown Editor Section -->
             <div class="mb-4">
-                <label class="block text-gray-700 text-sm font-bold mb-2" for="content">
-                    Content
-                </label>
-                <textarea class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline h-48" 
-                          id="content" name="content" required>{{ article.content }}</textarea>
+                <div class="flex justify-between items-center mb-2">
+                    <label class="block text-gray-700 text-sm font-bold" for="content">
+                        Content (Markdown)
+                    </label>
+                    <div class="flex space-x-2">
+                        <button type="button" id="editTab" class="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600 focus:outline-none">
+                            Edit
+                        </button>
+                        <button type="button" id="previewTab" class="px-3 py-1 text-sm bg-gray-300 text-gray-700 rounded hover:bg-gray-400 focus:outline-none">
+                            Preview
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Editor Panel -->
+                <div id="editorPanel">
+                    <textarea class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline font-mono" 
+                              id="content" name="content" rows="20" required>{{ article.content }}</textarea>
+                    
+                    <!-- Markdown Toolbar -->
+                    <div class="mt-2 flex flex-wrap gap-2 p-2 bg-gray-50 border rounded">
+                        <button type="button" class="markdown-btn px-2 py-1 text-xs bg-gray-200 hover:bg-gray-300 rounded" data-action="bold" title="Bold">
+                            <strong>B</strong>
+                        </button>
+                        <button type="button" class="markdown-btn px-2 py-1 text-xs bg-gray-200 hover:bg-gray-300 rounded" data-action="italic" title="Italic">
+                            <em>I</em>
+                        </button>
+                        <button type="button" class="markdown-btn px-2 py-1 text-xs bg-gray-200 hover:bg-gray-300 rounded" data-action="heading" title="Heading">
+                            H1
+                        </button>
+                        <button type="button" class="markdown-btn px-2 py-1 text-xs bg-gray-200 hover:bg-gray-300 rounded" data-action="link" title="Link">
+                            🔗
+                        </button>
+                        <button type="button" class="markdown-btn px-2 py-1 text-xs bg-gray-200 hover:bg-gray-300 rounded" data-action="code" title="Code">
+                            &lt;/&gt;
+                        </button>
+                        <button type="button" class="markdown-btn px-2 py-1 text-xs bg-gray-200 hover:bg-gray-300 rounded" data-action="list" title="List">
+                            • List
+                        </button>
+                        <button type="button" class="markdown-btn px-2 py-1 text-xs bg-gray-200 hover:bg-gray-300 rounded" data-action="quote" title="Quote">
+                            " Quote
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Preview Panel -->
+                <div id="previewPanel" class="hidden">
+                    <div class="border rounded p-4 bg-gray-50 min-h-96" id="previewContent">
+                        <p class="text-gray-500">Click "Preview" to see rendered content...</p>
+                    </div>
+                </div>
             </div>
-            <div class="flex items-center justify-end">
+            
+            <div class="flex items-center justify-between">
+                <button class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline" 
+                        type="button" onclick="exportArticle({{ article.id }}, '{{ article.title }}')">
+                    Export as Markdown
+                </button>
                 <button class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline" 
                         type="button" onclick="updateArticle({{ article.id }})">
                     Update
@@ -29,6 +82,133 @@
         </form>
 
         <script>
+        // Markdown Editor Functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            const editTab = document.getElementById('editTab');
+            const previewTab = document.getElementById('previewTab');
+            const editorPanel = document.getElementById('editorPanel');
+            const previewPanel = document.getElementById('previewPanel');
+            const contentTextarea = document.getElementById('content');
+            const previewContent = document.getElementById('previewContent');
+            
+            // Tab switching
+            editTab.addEventListener('click', function() {
+                showEditMode();
+            });
+            
+            previewTab.addEventListener('click', function() {
+                showPreviewMode();
+            });
+            
+            function showEditMode() {
+                editTab.classList.remove('bg-gray-300', 'text-gray-700');
+                editTab.classList.add('bg-blue-500', 'text-white');
+                previewTab.classList.remove('bg-blue-500', 'text-white');
+                previewTab.classList.add('bg-gray-300', 'text-gray-700');
+                
+                editorPanel.classList.remove('hidden');
+                previewPanel.classList.add('hidden');
+            }
+            
+            function showPreviewMode() {
+                previewTab.classList.remove('bg-gray-300', 'text-gray-700');
+                previewTab.classList.add('bg-blue-500', 'text-white');
+                editTab.classList.remove('bg-blue-500', 'text-white');
+                editTab.classList.add('bg-gray-300', 'text-gray-700');
+                
+                editorPanel.classList.add('hidden');
+                previewPanel.classList.remove('hidden');
+                
+                // Load preview content
+                updatePreview();
+            }
+            
+            function updatePreview() {
+                const markdownContent = contentTextarea.value;
+                
+                if (!markdownContent.trim()) {
+                    previewContent.innerHTML = '<p class="text-gray-500">No content to preview...</p>';
+                    return;
+                }
+                
+                // Show loading state
+                previewContent.innerHTML = '<p class="text-gray-500">Loading preview...</p>';
+                
+                fetch('/admin/articles/preview', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ content: markdownContent })
+                })
+                .then(response => {
+                    if (response.ok) {
+                        return response.json();
+                    }
+                    throw new Error('Preview failed');
+                })
+                .then(data => {
+                    previewContent.innerHTML = data.html;
+                })
+                .catch(error => {
+                    console.error('Preview error:', error);
+                    previewContent.innerHTML = '<p class="text-red-500">Preview failed. Please check your markdown syntax.</p>';
+                });
+            }
+            
+            // Markdown toolbar functionality
+            const markdownButtons = document.querySelectorAll('.markdown-btn');
+            markdownButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    const action = this.getAttribute('data-action');
+                    insertMarkdown(action);
+                });
+            });
+            
+            function insertMarkdown(action) {
+                const textarea = contentTextarea;
+                const start = textarea.selectionStart;
+                const end = textarea.selectionEnd;
+                const selectedText = textarea.value.substring(start, end);
+                let replacement = '';
+                
+                switch(action) {
+                    case 'bold':
+                        replacement = `**${selectedText || 'bold text'}**`;
+                        break;
+                    case 'italic':
+                        replacement = `*${selectedText || 'italic text'}*`;
+                        break;
+                    case 'heading':
+                        replacement = `# ${selectedText || 'Heading'}`;
+                        break;
+                    case 'link':
+                        replacement = `[${selectedText || 'link text'}](url)`;
+                        break;
+                    case 'code':
+                        if (selectedText.includes('\n')) {
+                            replacement = `\`\`\`\n${selectedText || 'code'}\n\`\`\``;
+                        } else {
+                            replacement = `\`${selectedText || 'code'}\``;
+                        }
+                        break;
+                    case 'list':
+                        replacement = `- ${selectedText || 'list item'}`;
+                        break;
+                    case 'quote':
+                        replacement = `> ${selectedText || 'quote'}`;
+                        break;
+                }
+                
+                textarea.value = textarea.value.substring(0, start) + replacement + textarea.value.substring(end);
+                
+                // Set cursor position
+                const newCursorPos = start + replacement.length;
+                textarea.setSelectionRange(newCursorPos, newCursorPos);
+                textarea.focus();
+            }
+        });
+        
         function updateArticle(articleId) {
             const form = document.getElementById('editForm');
             const formData = {
@@ -58,6 +238,40 @@
                 console.error('Error:', error);
                 alert('Error updating article');
             });
+        }
+        
+        function exportArticle(articleId, articleTitle) {
+            // Show loading state
+            const exportButton = event.target;
+            const originalText = exportButton.textContent;
+            exportButton.textContent = 'Exporting...';
+            exportButton.disabled = true;
+            
+            // Create a temporary link to trigger download
+            const link = document.createElement('a');
+            link.href = `/admin/articles/${articleId}/export`;
+            link.download = `${articleTitle}.md`;
+            
+            // Handle the download
+            link.addEventListener('click', function() {
+                // Reset button state after a short delay
+                setTimeout(() => {
+                    exportButton.textContent = originalText;
+                    exportButton.disabled = false;
+                }, 1000);
+            });
+            
+            // Handle errors
+            link.addEventListener('error', function() {
+                alert('Failed to export article');
+                exportButton.textContent = originalText;
+                exportButton.disabled = false;
+            });
+            
+            // Trigger the download
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
         }
         </script>
     </div>

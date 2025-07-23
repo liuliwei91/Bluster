@@ -16,3 +16,13 @@ bcrypt = "0.15.0"
 rand = "0.8.5"
 chrono = { version = "0.4.31", features = ["serde"] }
 actix-session = { version = "0.10.1", features = ["cookie-session"] }
+pulldown-cmark = "0.9"
+syntect = "5.1"
+ammonia = "3.3"
+gray_matter = "0.2"
+actix-multipart = "0.6"
+thiserror = "1.0"
+html-escape = "0.2"
+serde_yaml = "0.9"
+futures-util = "0.3"
+tokio = { version = "1.0", features = ["full"] }
